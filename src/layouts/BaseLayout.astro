@@ -112,9 +112,9 @@ const siteLd = {
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-    <link rel="icon" href="/icons/favicon-48.png" sizes="48x48" type="image/png" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
+    <link rel="icon" href="/icons/favicon-48.png?v=2" sizes="48x48" type="image/png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png?v=2" />
     <link rel="manifest" href="/manifest.webmanifest" />
 
     {/* Перф (аудит 2026-06-20): preload дисплей-шрифта Unbounded — он рисует H1/бренд
@@ -188,16 +188,16 @@ const siteLd = {
     <script is:inline type="application/ld+json" set:html={JSON.stringify(siteLd)} />
 
     <meta name="generator" content={Astro.generator} />
-    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon.svg?v=2" type="image/svg+xml" />
     {/* PNG-фолбэк фавикона: Google для сниппета выдачи надёжнее берёт растровый
         квадрат, кратный 48px (флаг Армении — плейсхолдер донора до ребренда). */}
-    <link rel="icon" type="image/png" sizes="96x96" href="/icons/favicon-96.png" />
-    <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png" />
+    <link rel="icon" type="image/png" sizes="96x96" href="/icons/favicon-96.png?v=2" />
+    <link rel="icon" type="image/png" sizes="48x48" href="/icons/favicon-48.png?v=2" />
 
     {/* PWA: манифест + иконки + цвет темы. theme-color = --color-wine (meta требует литерал). */}
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#8a5d18" />
-    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
+    <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png?v=2" />
 
     <!--
       Preload LCP-критичного body-шрифта (§15): Manrope 400 (latin). Прочие веса
