@@ -1,13 +1,14 @@
 ---
 /**
- * RatesBar (§8.4, Фаза 6) — тонкая utility-полоса в самом верху шапки:
- * погода по базам Армении (Ереван/Гюмри/Дилижан/Севан), закреплена инлайн
- * единым стилем. Полезна на любой странице → в глобальный хедер, без CLS.
+ * RatesBar (§8.4, Фаза 6) — тонкая utility-полоса в самом верху шапки: курс
+ * драма (AMD за 1 € / 1 $ / 1 £ / 100 ₽) + погода по базам Армении
+ * (Ереван/Гюмри/Дилижан/Севан) — ОБА закреплены инлайн единым стилем. Полезна
+ * на любой странице → в глобальный хедер, без CLS.
  *
  * Гибрид: значения зашиваются снапшотом на сборке (getLiveSnapshot, мемо — 1
  * запрос на билд даже при рендере на всех страницах), клиент (/js/live-data.js)
  * дотягивает свежие по тем же data-live ключам. Источник недоступен → снапшот,
- * нет и его → «—».
+ * нет и его → «—». Валюта Армении — драм (AMD): показываем, сколько AMD за единицу.
  */
 import { t, type Lang } from '../i18n';
 import { getLiveSnapshot } from '../lib/liveSnapshot';
@@ -22,6 +23,9 @@ const ld = dict.liveData;
 const snap = await getLiveSnapshot();
 
 const fmtT = (n: number | null): string => (typeof n === 'number' ? `${Math.round(n)}°` : '—');
+// Драм крупный (≈390 за €) → без копеек, с разделителем тысяч по локали.
+const fmtFx = (n: number | null): string =>
+  typeof n === 'number' ? `${Math.round(n)} AMD` : '—';
 
 const locale = 'en-US';
 let buildTime = '';
@@ -38,6 +42,25 @@ try {
 
 <div class="ratesbar" data-live>
   <div class="ratesbar__inner">
+    <ul class="rates" aria-label={ld.fx}>
+      <li class="rates__item">
+        <span class="rates__cur">1&nbsp;€</span>
+        <b data-live="fx-eur">{fmtFx(snap.fx.eur)}</b>
+      </li>
+      <li class="rates__item">
+        <span class="rates__cur">1&nbsp;$</span>
+        <b data-live="fx-usd">{fmtFx(snap.fx.usd)}</b>
+      </li>
+      <li class="rates__item">
+        <span class="rates__cur">1&nbsp;£</span>
+        <b data-live="fx-gbp">{fmtFx(snap.fx.gbp)}</b>
+      </li>
+      <li class="rates__item">
+        <span class="rates__cur">100&nbsp;₽</span>
+        <b data-live="fx-rub">{fmtFx(snap.fx.rub)}</b>
+      </li>
+    </ul>
+
     <div class="wx">
       <ul class="rates rates--wx" aria-label={ld.weather}>
         <li class="rates__item">
