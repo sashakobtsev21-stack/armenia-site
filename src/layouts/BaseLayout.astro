@@ -5,7 +5,7 @@
  * семантику и навигацию. Конкретные шаблоны (Article/Route/Hub) наследуют его в R3.
  */
 import '../styles/global.css';
-import { t, mirrorPath, langPrefix, DEFAULT_LANG, type Lang } from '../i18n';
+import { t, mirrorPath, DEFAULT_LANG, type Lang } from '../i18n';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 import CookieConsent from '../components/CookieConsent.astro';
@@ -198,14 +198,6 @@ const siteLd = {
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="theme-color" content="#0e6a73" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon-180.png" />
-
-    {/* RSS-фид этого языка (узел дистрибуции, DIST-R1-04). */}
-    <link
-      rel="alternate"
-      type="application/rss+xml"
-      title={dict.siteName}
-      href={`${langPrefix(lang)}/rss.xml`}
-    />
 
     <!--
       Preload LCP-критичного body-шрифта (§15): Manrope 400 (latin). Прочие веса
