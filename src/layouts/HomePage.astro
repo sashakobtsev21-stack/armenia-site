@@ -12,8 +12,9 @@
  * Состав: hero+поиск → витрина (золотая лента) + строка доверия → бэнд
  * «Услуги для жизни в Армении» (CTA) → свежие материалы → о проекте → footer (в Base).
  *
- * ⚠️ HERO — ПЛЕЙСХОЛДЕРЫ: изображения src/assets/hero/placeholder-*.jpg — кадры
- *    донора, заменить на армянские (монастыри/Севан/Каскад) ДО запуска (F3/F4).
+ * HERO — реальные CC-фото Армении (src/assets/hero/hero-*.webp, Wikimedia
+ *    Commons): Хор Вирап+Арарат, Татев (аэро), Севанаванк на оз. Севан.
+ *    Атрибуция и ссылка на файл — дословно как отдаёт Commons API.
  */
 import { getCollectionSafe } from '../loaders/getCollectionSafe';
 import BaseLayout from './BaseLayout.astro';
@@ -32,9 +33,11 @@ import ArticleCard from '../components/ArticleCard.astro';
 import Icon from '../components/Icon.astro';
 import EmptyHint from '../components/EmptyHint.astro';
 import { getImage } from 'astro:assets';
-import heroPlaceholder1 from '../assets/hero/placeholder-1.jpg';
-import heroPlaceholder2 from '../assets/hero/placeholder-2.jpg';
-import heroPlaceholder3 from '../assets/hero/placeholder-3.jpg';
+// Hero — реальные CC-фото Армении (Wikimedia Commons), 1920×860 webp.
+// Атрибуция (автор · лицензия · ссылка на файл) — ровно как отдаёт Commons API.
+import heroKhorVirap from '../assets/hero/hero-khor-virap.webp';
+import heroTatev from '../assets/hero/hero-tatev.webp';
+import heroSevan from '../assets/hero/hero-sevan.webp';
 
 interface Props {
   lang: Lang;
@@ -48,8 +51,8 @@ const description = dict.home.heroSubtitle;
 /**
  * Hero-фон с ротацией: кадр меняется каждые 3 часа (по 3-часовому окну
  * времени, floor(now / 3ч) % N) — чистая статика, без бэкенда. Исходники —
- * Unsplash (бесплатная лицензия); атрибуция (автор · Unsplash) и ссылка на фото —
- * в credit под кадром, меняются вместе с фото. astro:assets даёт адаптивный
+ * Wikimedia Commons (CC BY / CC BY-SA); атрибуция (автор / лицензия) и ссылка
+ * на файл — в credit под кадром, меняются вместе с фото. astro:assets даёт адаптивный
  * webp (responsive widths). LCP (§15): <img> рендерится без src, инлайн-скрипт
  * сразу за ним ставит srcset выбранного кадра (без двойной загрузки),
  * fetchpriority=high; <noscript> — дефолтный кадр для отключённого JS.
@@ -58,28 +61,30 @@ const description = dict.home.heroSubtitle;
 // чтобы широкий экран не апскейлил 1280px-кадры и не выглядел мыльно.
 const AVIF_WIDTHS = [640, 960, 1280, 1600, 1920];
 const WEBP_WIDTHS = [640, 960, 1280, 1600];
-// ⚠️ ПЛЕЙСХОЛДЕР-кадры донора (credit/href нейтральные) — заменить на армянские
-//    CC-фото с корректной атрибуцией ДО запуска (F3/F4).
+// Реальные CC-фото Армении (Wikimedia Commons). Самый узнаваемый кадр —
+// первым (LCP): Хор Вирап на фоне Арарата. Атрибуция (автор / лицензия) и
+// ссылка на страницу файла — дословно как отдаёт Commons API; меняются вместе
+// с кадром (см. /js/hero-rotate.js). focus подстроен под композицию.
 const heroSources = [
   {
-    img: heroPlaceholder1,
-    q: 60,
-    credit: 'Placeholder — replace with Armenia photo before launch',
-    href: '#',
+    img: heroKhorVirap,
+    q: 50,
+    credit: 'Vyacheslav Argenberg / Wikimedia Commons, CC BY 4.0',
+    href: 'https://commons.wikimedia.org/wiki/File:Mount_Ararat_and_Khor_Virap,_Ararat_Plain,_Armenia.jpg',
+    focus: '50% 35%',
+  },
+  {
+    img: heroTatev,
+    q: 50,
+    credit: 'Vahagn Grigoryan / Wikimedia Commons, CC BY-SA 4.0',
+    href: 'https://commons.wikimedia.org/wiki/File:DJI-Tatev.jpg',
     focus: '50% 50%',
   },
   {
-    img: heroPlaceholder2,
-    q: 62,
-    credit: 'Placeholder — replace with Armenia photo before launch',
-    href: '#',
-    focus: '50% 50%',
-  },
-  {
-    img: heroPlaceholder3,
-    q: 62,
-    credit: 'Placeholder — replace with Armenia photo before launch',
-    href: '#',
+    img: heroSevan,
+    q: 50,
+    credit: 'Alexxx1979 / Wikimedia Commons, CC BY-SA 4.0',
+    href: 'https://commons.wikimedia.org/wiki/File:Armenia._Lake_Sevan._Sevanavank_P8230612_2350.jpg',
     focus: '50% 50%',
   },
 ];
