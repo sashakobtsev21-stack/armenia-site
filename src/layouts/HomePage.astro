@@ -1,0 +1,861 @@
+---
+/**
+ * HomePage (§8.4) — главная, направление «Полевой журнал».
+ * Сайт одноязычный (en на корне) — язык приходит пропсом, весь текст из
+ * словарей (§12). Контента в коллекциях нет на старте → честные пустые
+ * состояния, без выдуманных статей/мест/цен (CLAUDE правило 4).
+ *
+ * Посыл — справочный и коллективный: места отбираются по высокому рейтингу и
+ * сверяются с опытными путешественниками, гидами и местными жителями. Без
+ * персональной личности автора.
+ *
+ * Состав: hero+поиск → витрина (золотая лента) + строка доверия → бэнд
+ * «Услуги для жизни в Армении» (CTA) → свежие материалы → о проекте → footer (в Base).
+ *
+ * ⚠️ HERO — ПЛЕЙСХОЛДЕРЫ: изображения src/assets/hero/placeholder-*.jpg — кадры
+ *    донора, заменить на армянские (монастыри/Севан/Каскад) ДО запуска (F3/F4).
+ */
+import { getCollectionSafe } from '../loaders/getCollectionSafe';
+import BaseLayout from './BaseLayout.astro';
+import {
+  t,
+  ALL_SECTION_KEYS,
+  sectionHref,
+  articleHref,
+  formatDate,
+  type Lang,
+  type SectionKey,
+} from '../i18n';
+import ShowcaseRail, { type ShowcaseItem } from '../components/ShowcaseRail.astro';
+import SearchBox, { type SearchItem } from '../components/SearchBox.astro';
+import ArticleCard from '../components/ArticleCard.astro';
+import Icon from '../components/Icon.astro';
+import EmptyHint from '../components/EmptyHint.astro';
+import { getImage } from 'astro:assets';
+import heroPlaceholder1 from '../assets/hero/placeholder-1.jpg';
+import heroPlaceholder2 from '../assets/hero/placeholder-2.jpg';
+import heroPlaceholder3 from '../assets/hero/placeholder-3.jpg';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+const dict = t(lang);
+
+const pageTitle = `${dict.siteName} — ${dict.tagline}`;
+const description = dict.home.heroSubtitle;
+
+/**
+ * Hero-фон с ротацией: кадр меняется каждые 3 часа (по 3-часовому окну
+ * времени, floor(now / 3ч) % N) — чистая статика, без бэкенда. Исходники —
+ * Unsplash (бесплатная лицензия); атрибуция (автор · Unsplash) и ссылка на фото —
+ * в credit под кадром, меняются вместе с фото. astro:assets даёт адаптивный
+ * webp (responsive widths). LCP (§15): <img> рендерится без src, инлайн-скрипт
+ * сразу за ним ставит srcset выбранного кадра (без двойной загрузки),
+ * fetchpriority=high; <noscript> — дефолтный кадр для отключённого JS.
+ */
+// Hero — full-bleed фон со скримом. Десктопу отдаём до 1920px AVIF / 1600px WebP,
+// чтобы широкий экран не апскейлил 1280px-кадры и не выглядел мыльно.
+const AVIF_WIDTHS = [640, 960, 1280, 1600, 1920];
+const WEBP_WIDTHS = [640, 960, 1280, 1600];
+// ⚠️ ПЛЕЙСХОЛДЕР-кадры донора (credit/href нейтральные) — заменить на армянские
+//    CC-фото с корректной атрибуцией ДО запуска (F3/F4).
+const heroSources = [
+  {
+    img: heroPlaceholder1,
+    q: 60,
+    credit: 'Placeholder — replace with Armenia photo before launch',
+    href: '#',
+    focus: '50% 50%',
+  },
+  {
+    img: heroPlaceholder2,
+    q: 62,
+    credit: 'Placeholder — replace with Armenia photo before launch',
+    href: '#',
+    focus: '50% 50%',
+  },
+  {
+    img: heroPlaceholder3,
+    q: 62,
+    credit: 'Placeholder — replace with Armenia photo before launch',
+    href: '#',
+    focus: '50% 50%',
+  },
+];
+const heroVariants = await Promise.all(
+  heroSources.map(async (s) => {
+    const [avif, webp] = await Promise.all([
+      getImage({ src: s.img, width: 1920, widths: AVIF_WIDTHS, format: 'avif', quality: s.q }),
+      getImage({ src: s.img, width: 1600, widths: WEBP_WIDTHS, format: 'webp', quality: 76 }),
+    ]);
+    return {
+      avifSrcset: avif.srcSet.attribute,
+      webpSrcset: webp.srcSet.attribute,
+      src: webp.src,
+      focus: s.focus,
+      href: s.href,
+      credit: s.credit,
+    };
+  }),
+);
+const heroDefault = heroVariants[0];
+
+/**
+ * Индекс для клиентского поиска (§8.4): берём опубликованные статьи этого
+ * языка. На R2 коллекция пуста → items = [] → SearchBox показывает корректное
+ * пустое состояние. Никаких подделанных результатов.
+ */
+const articles = await getCollectionSafe(
+  'articles',
+  (entry) =>
+    entry.data.lang === lang && entry.data.draft !== true && entry.data.demo !== true,
+);
+const routes = await getCollectionSafe(
+  'routes',
+  (entry) => entry.data.lang === lang && entry.data.draft !== true && entry.data.demo !== true,
+);
+const visibleCutoff = Date.now();
+const visibleArticles = articles.filter((entry) => entry.data.publishedAt.getTime() <= visibleCutoff);
+const visibleRoutes = routes.filter((entry) => entry.data.publishedAt.getTime() <= visibleCutoff);
+
+const searchItems: SearchItem[] = visibleArticles.map((entry) => ({
+  title: entry.data.title,
+  url: articleHref(lang, entry.data.category, entry.data.slug),
+  section: dict.nav[entry.data.category as SectionKey] ?? entry.data.category,
+}));
+
+/**
+ * Свежие материалы (§8.4): 6 самых новых опубликованных материалов этого языка.
+ * Новости показываются отдельной лентой выше, будущие даты не всплывают до срока.
+ */
+const freshCards = [
+  ...visibleArticles.filter((entry) => entry.data.category !== 'news'),
+  ...visibleRoutes,
+]
+  .sort((a, b) => {
+    const diff = b.data.publishedAt.getTime() - a.data.publishedAt.getTime();
+    return diff !== 0 ? diff : a.data.slug.localeCompare(b.data.slug);
+  })
+  .slice(0, 6)
+  .map((entry) => {
+    const verifiedAt = 'verifiedAt' in entry.data ? entry.data.verifiedAt : undefined;
+    return {
+      key: entry.id,
+      href: articleHref(lang, entry.data.category, entry.data.slug),
+      title: entry.data.title,
+      description: entry.data.description,
+      cover: entry.data.cover,
+      date: formatDate(verifiedAt ?? entry.data.updatedAt, lang),
+      verified: (verifiedAt ? 'verified' : 'updated') as 'verified' | 'updated',
+      verifiedPhoto: 'verifiedPhoto' in entry.data ? entry.data.verifiedPhoto : undefined,
+    };
+  });
+const hasFresh = freshCards.length > 0;
+
+/**
+ * Блок «Новости» на главной (§8.4): всегда последние 3 опубликованные новости.
+ * Не фильтруем по возрасту, чтобы блок не пустел между новостными циклами.
+ */
+const homeNews = visibleArticles
+  .filter((entry) => entry.data.category === 'news')
+  .sort((a, b) => b.data.publishedAt.getTime() - a.data.publishedAt.getTime())
+  .slice(0, 3)
+  .map((entry) => ({
+    href: articleHref(lang, 'news', entry.data.slug),
+    title: entry.data.title,
+    date: formatDate(entry.data.verifiedAt ?? entry.data.publishedAt, lang),
+    iso: entry.data.publishedAt.toISOString().slice(0, 10),
+  }));
+const hasHomeNews = homeNews.length > 0;
+
+/**
+ * Витрина (§8.4/§16): золотая лента из ключевых материалов + одно открытое
+ * рекламное место (инвентарь под продажу). Подборка курируется по слугам, но
+ * обложка/заголовок берутся из коллекции — реальные данные, не выдумываем
+ * (CLAUDE правило 4). Маршруты живут в отдельной коллекции `routes`.
+ */
+const showcaseRestaurants = await getCollectionSafe(
+  'restaurants',
+  (entry) => entry.data.lang === lang && entry.data.draft !== true,
+);
+// Заведения перемешаны со статьями/маршрутами (не подряд) — решение владельца.
+// Витрина наполнена опубликованными городами (`category: 'cities'`). Несуществующие
+// слуги отсеиваются в цикле ниже (нет entry/cover → continue), так что добавлять
+// новые пики безопасно — карточка появится, как только материал опубликован.
+// Тип объявлен явно (union), чтобы петля-резолвер ниже принимала и
+// рестораны/маршруты/place-карточки, когда такой контент появится.
+type ShowcaseKicker = keyof typeof dict.home.showcase.kickers;
+type ShowcasePick =
+  | { kind: 'restaurant'; slug: string; edaSlug: string; kicker: ShowcaseKicker }
+  | { kind: 'route'; slug: string; kicker: ShowcaseKicker }
+  | {
+      kind: 'article';
+      category: string;
+      slug: string;
+      kicker: ShowcaseKicker;
+      quality?: boolean;
+      city?: string;
+      place?: boolean;
+      cardTitle?: string;
+      mapUrl?: string;
+    };
+// Витрина ссылается на слаги core-corpus Армении (docs/new-sites/armenia-plan-*).
+// Контента пока нет → пики молча пропускаются (entry не найден). По мере выхода
+// статей с этими слугами карточки появятся автоматически.
+const showcasePicks: ShowcasePick[] = [
+  { kind: 'article', category: 'cities', slug: 'things-to-do-in-yerevan', kicker: 'city', city: 'Yerevan' },
+  { kind: 'article', category: 'cities', slug: 'gyumri-travel-guide', kicker: 'city', city: 'Gyumri' },
+  { kind: 'article', category: 'cities', slug: 'dilijan-travel-guide', kicker: 'city', city: 'Dilijan' },
+  { kind: 'route', slug: 'armenia-7-day-itinerary', kicker: 'route' },
+  { kind: 'article', category: 'attractions', slug: 'tatev-monastery-wings-of-tatev', kicker: 'sight' },
+  { kind: 'article', category: 'attractions', slug: 'khor-virap-monastery', kicker: 'sight' },
+  { kind: 'article', category: 'attractions', slug: 'lake-sevan-armenia', kicker: 'sight' },
+  { kind: 'article', category: 'attractions', slug: 'garni-temple-geghard-monastery', kicker: 'sight' },
+  { kind: 'article', category: 'planning', slug: 'best-time-to-visit-armenia', kicker: 'guide' },
+  { kind: 'article', category: 'planning', slug: 'how-many-days-in-armenia', kicker: 'guide' },
+  { kind: 'article', category: 'car-rental', slug: 'car-rental-armenia', kicker: 'guide' },
+  { kind: 'article', category: 'transport', slug: 'getting-around-armenia', kicker: 'guide' },
+  { kind: 'article', category: 'insurance', slug: 'armenia-travel-insurance', kicker: 'guide' },
+  { kind: 'article', category: 'entertainment', slug: 'yerevan-nightlife-wine-bars', kicker: 'nightlife', city: 'Yerevan' },
+];
+const showcaseItems: ShowcaseItem[] = [];
+// Дедуп по slug: один материал — одна карточка в витрине (двойных пиков не
+// допускаем, чтобы крутилка не показывала одинаковые карточки рядом). Источник
+// непрерывности — клонирование уникального набора в /js/showcase-rail.js.
+const seenShowcaseSlugs = new Set<string>();
+for (const pick of showcasePicks) {
+  if (seenShowcaseSlugs.has(pick.slug)) continue;
+  seenShowcaseSlugs.add(pick.slug);
+  if (pick.kind === 'restaurant') {
+    const r = showcaseRestaurants.find((x) => x.data.slug === pick.slug);
+    if (!r || !r.data.cover) continue;
+    showcaseItems.push({
+      href: `${sectionHref(lang, 'food')}${pick.edaSlug}/#r-${r.data.slug}`,
+      title: r.data.name,
+      cover: r.data.cover,
+      kicker: dict.home.showcase.kickers[pick.kicker],
+      city: r.data.city,
+      place: true,
+      quality: r.data.qualityMark === true,
+      subtitle: r.data.cuisine,
+      hours: r.data.hours,
+      info: r.data.summary,
+      address: r.data.geo.address,
+      mapUrl: r.data.mapUrl,
+      website: r.data.website,
+      instagram: r.data.instagram,
+      photos: [
+        { src: r.data.cover.src, alt: r.data.cover.alt, credit: r.data.coverCredit },
+        ...(r.data.gallery ?? []).map((g) => ({ src: g.src, alt: g.alt, credit: g.credit })),
+      ],
+    });
+    continue;
+  }
+  const entry =
+    pick.kind === 'route'
+      ? visibleRoutes.find((r) => r.data.slug === pick.slug)
+      : visibleArticles.find((a) => a.data.category === pick.category && a.data.slug === pick.slug);
+  if (!entry || !entry.data.cover) continue;
+  const category = pick.kind === 'route' ? 'routes' : pick.category;
+  const p = pick as {
+    quality?: boolean;
+    city?: string;
+    place?: boolean;
+    cardTitle?: string;
+    mapUrl?: string;
+  };
+  if (p.place) {
+    // Статья-место (Teatro): рендерим как place-карточку витрины с поповером
+    // (адрес/часы/карта/сайт) и каруселью фото — как у заведений.
+    const fallbackCity = 'Yerevan';
+    showcaseItems.push({
+      href: articleHref(lang, category, entry.data.slug),
+      title: p.cardTitle ?? entry.data.title,
+      cover: entry.data.cover,
+      kicker: dict.home.showcase.kickers[pick.kicker],
+      city: p.city ?? fallbackCity,
+      place: true,
+      quality: p.quality === true,
+      hours: entry.data.visit?.hours,
+      info: entry.data.description,
+      address: entry.data.geo?.address,
+      mapUrl: p.mapUrl,
+      website: entry.data.website,
+      instagram: entry.data.instagram,
+      photos: [
+        { src: entry.data.cover.src, alt: entry.data.cover.alt },
+        ...(entry.data.gallery ?? []).map((g: { src: string; alt: string; credit?: string }) => ({
+          src: g.src,
+          alt: g.alt,
+          credit: g.credit,
+        })),
+      ],
+    });
+    continue;
+  }
+  showcaseItems.push({
+    href: articleHref(lang, category, entry.data.slug),
+    title: entry.data.title,
+    cover: entry.data.cover,
+    kicker: dict.home.showcase.kickers[pick.kicker],
+    // Знак качества на карточке-статье — только по запросу владельца (Teatro).
+    quality: p.quality === true,
+    // Опознавательный пин-чип города (для заведений). Задаётся явно у pick:
+    // напр. { kind:'article', category:'food', slug:'…', kicker:'food', city:'Yerevan' }.
+    // У текущих контентных карточек (города/маршруты) не задан → чип не рисуется.
+    city: p.city,
+  });
+}
+// Открытое рекламное место («Разместите своё заведение») убрано с витрины по
+// решению владельца 2026-06-17. Поддержка ad-слота в ShowcaseRail оставлена
+// спящей — чтобы вернуть, снова добавить сюда showcaseItems.push({ ad:true, ... }).
+
+---
+
+<BaseLayout title={pageTitle} description={description} lang={lang}>
+  {
+    /* 1. Hero — текстовый, без тяжёлой картинки (LCP, §15).
+       data-hero-stagger: мягкий вход H1→подзаголовок→поиск (≤450мс), только
+       при .js-anim и разрешённом движении (FOUC-safe, см. global.css). */
+  }
+  <section class="hero">
+    <picture>
+      <source id="heroAvif" type="image/avif" srcset={heroDefault.avifSrcset} sizes="100vw" />
+      <img
+        class="hero__bg"
+        id="heroBg"
+        src={heroDefault.src}
+        srcset={heroDefault.webpSrcset}
+        sizes="100vw"
+        alt=""
+        decoding="async"
+        fetchpriority="high"
+        style={`object-position:${heroDefault.focus}`}
+      />
+    </picture>
+    <script
+      is:inline
+      type="application/json"
+      id="hero-variants"
+      set:html={JSON.stringify({
+        variants: heroVariants,
+        periodMs: 3 * 60 * 60 * 1000,
+        prefix: dict.home.photoPrefix,
+      })}
+    />
+    <script is:inline src="/js/hero-rotate.js"></script>
+    <div class="hero__scrim"></div>
+    <div class="container hero__content" data-hero-stagger>
+      <h1 class="hero__title">{dict.home.heroTitle}</h1>
+      <p class="hero__subtitle">{dict.home.heroSubtitle}</p>
+      <SearchBox lang={lang} items={searchItems} />
+    </div>
+    <a
+      class="hero__credit"
+      id="heroCredit"
+      href={heroDefault.href}
+      target="_blank"
+      rel="noopener nofollow"
+    >
+      {dict.home.photoPrefix}: {heroDefault.credit}
+    </a>
+  </section>
+
+  {/* Новости — последние 3 опубликованные новости; блок скрывается, если новостей нет (§8.4). */}
+  {
+    hasHomeNews && (
+      <section class="block news-strip" data-news-section data-reveal>
+        <div class="container" data-news-feed>
+          <div class="news-strip__head">
+            <h2 class="block__heading">{dict.newsFeed.recentHeading}</h2>
+            <a class="news-strip__all" href={sectionHref(lang, 'news')}>
+              {dict.newsFeed.all}
+              <Icon name="arrow-right" size={16} />
+            </a>
+          </div>
+          <ul class="news-strip__list">
+            {homeNews.map((n) => (
+              <li class="news-strip__item" data-news-item data-published={n.iso}>
+                <time class="news-strip__date">{n.date}</time>
+                <a class="news-strip__link" href={n.href}>
+                  {n.title}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </section>
+    )
+  }
+
+  {/* 2. Витрина — золотая лента партнёров/материалов (заменяет «С чего начать»). */}
+  <section class="block block--showcase">
+    <div class="container">
+      <h2 class="block__heading" data-reveal>{dict.home.showcase.heading}</h2>
+      <p class="showcase-lead" data-reveal>
+        {dict.home.showcase.lead}{' '}
+        <span class="showcase-lead__partner">{dict.home.showcase.partnerNote}</span>
+      </p>
+      <ShowcaseRail lang={lang} items={showcaseItems} label={dict.home.showcase.aria} />
+      <p class="trust-line" data-reveal>
+        {dict.home.trustLead}{' '}
+        <a class="trust-line__link" href={sectionHref(lang, 'about')}>
+          {dict.home.about.link}
+          <Icon name="arrow-right" size={16} />
+        </a>
+      </p>
+    </div>
+  </section>
+
+  {/* 2b. Разделы путеводителя — on-page входы во ВСЕ разделы, включая «денежные»
+       (Транспорт/Аренда/Страховки/Новости), иначе зарытые в ☰/футер (аудит NAV-2). */}
+  <section class="block block--sections">
+    <div class="container">
+      <h2 class="block__heading" data-reveal>{dict.home.sectionsHeading}</h2>
+      <ul class="home-sections" data-reveal>
+        {ALL_SECTION_KEYS.map((key) => (
+          <li>
+            <a class="home-section" href={sectionHref(lang, key)}>
+              <span>{dict.nav[key]}</span>
+              <Icon name="arrow-right" size={16} />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  {/* 3. Услуги для жизни в Армении — заметный CTA-бэнд (продаваемый инвентарь, §16). */}
+  <section class="services-band">
+    <div class="container services-band__inner" data-reveal>
+      <div class="services-band__text">
+        <h2 class="services-band__title">{dict.relocation.uslugi.heading}</h2>
+        <p class="services-band__lead">{dict.relocation.uslugi.text}</p>
+      </div>
+      <a class="services-band__cta" href={`${sectionHref(lang, 'relocation')}services/`}>
+        {dict.relocation.uslugi.cta}
+        <Icon name="arrow-right" size={18} />
+      </a>
+    </div>
+  </section>
+
+  {/* 4. Свежие материалы — витрина 6 последних статей (или честное пустое состояние) */}
+  <section class="block">
+    <div class="container">
+      <h2 class="block__heading" data-reveal>{dict.home.freshHeading}</h2>
+      {
+        hasFresh ? (
+          <div class="fresh-grid">
+            {freshCards.map((card) => (
+              <ArticleCard
+                lang={lang}
+                href={card.href}
+                title={card.title}
+                description={card.description}
+                cover={card.cover}
+                date={card.date}
+                verified={card.verified}
+                verifiedPhoto={card.verifiedPhoto}
+                meta={[]}
+              />
+            ))}
+          </div>
+        ) : (
+          <div data-reveal><EmptyHint text={dict.home.freshEmpty} /></div>
+        )
+      }
+    </div>
+  </section>
+
+  {/* 6. О проекте — нейтральный блок со ссылкой на /about/ */}
+  <section class="block">
+    <div class="container about">
+      <h2 class="block__heading" data-reveal>{dict.home.about.heading}</h2>
+      <p class="about__text" data-reveal>{dict.home.about.text}</p>
+      <a class="about__link" href={sectionHref(lang, 'about')} data-reveal>
+        {dict.home.about.link}
+        <Icon name="arrow-right" size={18} />
+      </a>
+    </div>
+  </section>
+</BaseLayout>
+
+<style>
+  .container {
+    max-width: var(--container-content);
+    margin: 0 auto;
+    padding-inline: var(--space-4);
+  }
+
+  /* Hero — фотофон Армении (плейсхолдеры донора) + тёмный скрим, светлый текст.
+     Картинка — LCP-элемент: astro:assets даёт адаптивные avif/webp, грузим
+     eager+high. Скрим обеспечивает контраст ≥4.5 (§6). Параллакса нет → §15. */
+  .hero {
+    position: relative;
+    isolation: isolate;
+    display: flex;
+    align-items: center;
+    min-height: clamp(440px, 72vh, 660px);
+    overflow: hidden;
+    /* Тёмный фон-заглушка под фото (до загрузки / без JS) — светлый текст читаем. */
+    background-color: var(--color-slate);
+  }
+  .hero__bg {
+    position: absolute;
+    inset: 0;
+    z-index: -2;
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: 50% 50%;
+  }
+  /*
+   * Скрим направленный: тёмный слева (под текстом) → прозрачный справа, чтобы
+   * фото оставалось ярким (правка владельца 2026-06-17). Плюс лёгкая подложка
+   * снизу под кредит. На мобайле текст шире → вертикальный градиент (легче, чем
+   * раньше: 10/42/60 вместо 20/44/74), читаемость держит усиленная тень текста.
+   */
+  .hero__scrim {
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      linear-gradient(
+        90deg,
+        var(--hero-scrim-text) 0%,
+        var(--hero-scrim-text-2) 34%,
+        var(--hero-scrim-text-3) 60%,
+        transparent 78%
+      ),
+      linear-gradient(0deg, var(--hero-scrim-base) 0%, transparent 30%);
+  }
+  @media (max-width: 768px) {
+    .hero__scrim {
+      background: linear-gradient(
+        180deg,
+        color-mix(in srgb, var(--color-slate) 20%, transparent) 0%,
+        color-mix(in srgb, var(--color-slate) 50%, transparent) 48%,
+        color-mix(in srgb, var(--color-slate) 66%, transparent) 100%
+      );
+    }
+  }
+  .hero__content {
+    position: relative;
+    width: 100%;
+    padding-block: var(--space-12);
+  }
+  .hero__title {
+    font-size: var(--text-3xl);
+    margin: 0;
+    max-width: 18ch;
+    color: var(--hero-text);
+    text-shadow: var(--hero-text-shadow);
+  }
+  .hero__subtitle {
+    margin: var(--space-4) 0 var(--space-6);
+    font-size: var(--text-xl);
+    color: var(--hero-text-muted);
+    max-width: 46ch;
+    text-shadow: var(--hero-text-shadow);
+  }
+  /* SearchBox поверх фото: подсказка — светлой (контраст), а выпадашка
+     результатов/пустого — на сплошной белой панели, чтобы читалась. */
+  .hero :global(.search__hint) {
+    color: var(--hero-text-muted);
+    text-shadow: var(--hero-text-shadow);
+  }
+  .hero :global(.search__results:not([hidden])),
+  .hero :global(.search__empty:not([hidden])) {
+    background: var(--surface-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-card);
+    padding: var(--space-2);
+    box-shadow: var(--shadow-raised);
+  }
+  .hero :global(.search__empty:not([hidden])) {
+    color: var(--text-body);
+  }
+  .hero__credit {
+    position: absolute;
+    right: var(--space-3);
+    bottom: var(--space-2);
+    z-index: 1;
+    font-size: 0.75rem;
+    line-height: 1.2;
+    /* Кредит вне зоны левого скрима → на ярких кадрах контраст падал <2:1.
+       Локальная тёмная подложка + тень гарантируют читаемость на любом фото,
+       сохраняя «фото-первый» вид (аудит 2026-06-17, a11y/§18). */
+    color: var(--hero-text);
+    background: color-mix(in srgb, var(--color-slate) 52%, transparent);
+    padding: 2px var(--space-2);
+    border-radius: var(--radius-pill);
+    text-shadow: 0 1px 3px color-mix(in srgb, black 75%, transparent);
+    text-decoration: none;
+    transition: background var(--dur) var(--ease-standard);
+  }
+  .hero__credit:hover,
+  .hero__credit:focus-visible {
+    background: color-mix(in srgb, var(--color-slate) 68%, transparent);
+    text-decoration: underline;
+  }
+  /* Фокус-кольцо повторяет форму пилюли (а не прямоугольник из global.css). */
+  .hero__credit:focus-visible {
+    border-radius: var(--radius-pill);
+  }
+  @media (min-width: 768px) {
+    .hero__title {
+      font-size: var(--text-4xl);
+    }
+  }
+
+  /* Секции */
+  .block {
+    padding-block: var(--space-12);
+  }
+  .block__heading {
+    font-size: var(--text-2xl);
+    margin: 0 0 var(--space-8);
+  }
+
+  /* Витрина: заголовок плотнее к лиду, лид приглушён. */
+  .block--showcase .block__heading {
+    margin-bottom: var(--space-3);
+  }
+  .showcase-lead {
+    margin: 0 0 var(--space-8);
+    color: var(--text-muted);
+    max-width: 64ch;
+  }
+  /* Прозрачность рекламы (§16): витрина включает партнёрские размещения. */
+  .showcase-lead__partner {
+    display: block;
+    margin-top: var(--space-1);
+    font-size: var(--text-sm);
+  }
+
+  /* Сетка «Разделы путеводителя» (аудит NAV-2) — входы во все разделы. */
+  .home-sections {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-3);
+    /* auto-fill → на узких экранах меньше колонок (1 на 320px), без переполнения. */
+    grid-template-columns: repeat(auto-fill, minmax(10rem, 1fr));
+  }
+  .home-section {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
+    height: 100%;
+    min-width: 0;
+    padding: var(--space-3) var(--space-4);
+    background: var(--surface-card);
+    border: 1px solid var(--border-card);
+    border-radius: var(--radius-card);
+    color: var(--text-body);
+    font-weight: 500;
+    text-decoration: none;
+    transition:
+      border-color var(--dur) var(--ease-standard),
+      transform var(--dur) var(--ease-standard);
+  }
+  .home-section:hover,
+  .home-section:focus-visible {
+    border-color: var(--color-wine);
+    transform: translateY(-2px);
+  }
+  .home-section :global(svg) {
+    flex: none;
+    color: var(--color-wine);
+  }
+
+  /* Услуги для жизни — заметный вино-бэнд с солнечным CTA (инвентарь рекламы). */
+  .services-band {
+    background: var(--color-wine);
+    color: var(--text-on-wine);
+    padding-block: var(--space-12);
+  }
+  .services-band__inner {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-6);
+  }
+  .services-band__text {
+    max-width: 54ch;
+  }
+  .services-band__title {
+    font-size: var(--text-2xl);
+    margin: 0 0 var(--space-2);
+    color: var(--color-white);
+  }
+  .services-band__lead {
+    margin: 0;
+    color: color-mix(in srgb, var(--color-white) 86%, transparent);
+  }
+  .services-band__cta {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    flex: none;
+    padding: var(--space-3) var(--space-6);
+    background: var(--cta-bg);
+    color: var(--text-on-cta);
+    font-weight: 600;
+    text-decoration: none;
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-cta);
+    transition:
+      background-color var(--dur) var(--ease-standard),
+      transform var(--dur) var(--ease-standard);
+  }
+  .services-band__cta:hover,
+  .services-band__cta:focus-visible {
+    background: var(--cta-bg-hover);
+    transform: translateY(-2px);
+  }
+  .services-band__cta :global(svg) {
+    flex: none;
+    transition: transform var(--dur) var(--ease-standard);
+  }
+  .services-band__cta:hover :global(svg) {
+    transform: translateX(3px);
+  }
+
+  /* Компактная строка доверия под витриной (заменила большую плашку «проверено»). */
+  .trust-line {
+    margin: var(--space-6) 0 0;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+    max-width: 70ch;
+  }
+  .trust-line__link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--link);
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .trust-line__link:hover,
+  .trust-line__link:focus-visible {
+    color: var(--link-hover);
+    text-decoration: underline;
+  }
+  .trust-line__link :global(svg) {
+    flex: none;
+  }
+
+  /* Блок «Новости» под hero — компактная лента строк (дата + заголовок). */
+  .news-strip__head {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: var(--space-2) var(--space-4);
+    margin-bottom: var(--space-6);
+  }
+  .news-strip__head .block__heading {
+    margin: 0;
+  }
+  .news-strip__all {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    color: var(--link);
+    font-weight: 500;
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .news-strip__all:hover,
+  .news-strip__all:focus-visible {
+    color: var(--link-hover);
+    text-decoration: underline;
+  }
+  .news-strip__all :global(svg) {
+    flex: none;
+  }
+  .news-strip__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: var(--space-3);
+  }
+  .news-strip__item {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--space-1) var(--space-3);
+    padding-bottom: var(--space-3);
+    border-bottom: 1px solid var(--border-hairline);
+  }
+  .news-strip__date {
+    flex: none;
+    font-size: var(--text-sm);
+    font-weight: 600;
+    color: var(--color-wine);
+    font-variant-numeric: tabular-nums;
+  }
+  .news-strip__link {
+    color: var(--text-body);
+    text-decoration: none;
+    font-weight: 500;
+  }
+  .news-strip__link:hover,
+  .news-strip__link:focus-visible {
+    color: var(--color-wine);
+    text-decoration: underline;
+    text-underline-offset: 3px;
+  }
+
+  /* Витрина «свежие материалы» — сетка карточек (как в хабе). */
+  .fresh-grid {
+    display: grid;
+    gap: var(--space-4);
+    grid-template-columns: 1fr;
+  }
+  @media (min-width: 640px) {
+    .fresh-grid {
+      grid-template-columns: 1fr 1fr;
+    }
+  }
+  @media (min-width: 1024px) {
+    .fresh-grid {
+      grid-template-columns: repeat(3, 1fr);
+    }
+  }
+
+  /* Пустое состояние «свежие материалы» */
+  /* О проекте */
+  .about__text {
+    margin: 0 0 var(--space-6);
+    color: var(--text-body);
+    max-width: 60ch;
+  }
+  .about__link {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    color: var(--link);
+    font-weight: 500;
+    text-decoration: none;
+    transition: color var(--dur) var(--ease-standard);
+  }
+  .about__link:hover,
+  .about__link:focus-visible {
+    color: var(--link-hover);
+  }
+  .about__link :global(svg) {
+    flex: none;
+    transition: transform var(--dur) var(--ease-standard);
+  }
+  .about__link:hover :global(svg) {
+    transform: translateX(3px);
+  }
+</style>

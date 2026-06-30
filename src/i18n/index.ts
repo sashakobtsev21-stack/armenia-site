@@ -1,0 +1,214 @@
+/**
+ * Точка входа i18n (SPEC §12). Сайт одноязычный — только английский (en) на
+ * корне `/`. Без автодетекта и редиректов по гео/Accept-Language.
+ */
+import { en } from './en';
+import {
+  DEFAULT_LANG,
+  ATTRACTION_TYPE_SLUGS,
+  REGION_SLUGS,
+  RAZVL_TYPE_SLUGS,
+  SERVICE_RUBRIC_SLUGS,
+  CUISINE_KEY_SLUGS,
+  EDA_CITY_KEYS,
+  type Lang,
+  type SectionKey,
+  type UIDictionary,
+  type HubSectionKey,
+  type HubSectionContent,
+  type AttractionTypeSlug,
+  type RegionSlug,
+  type RazvlTypeSlug,
+  type ServiceRubricSlug,
+  type CuisineKeySlug,
+  type EdaCityKey,
+} from './types';
+
+export {
+  DEFAULT_LANG,
+  ATTRACTION_TYPE_SLUGS,
+  REGION_SLUGS,
+  RAZVL_TYPE_SLUGS,
+  SERVICE_RUBRIC_SLUGS,
+  CUISINE_KEY_SLUGS,
+  EDA_CITY_KEYS,
+  type Lang,
+  type SectionKey,
+  type UIDictionary,
+  type HubSectionKey,
+  type HubSectionContent,
+  type AttractionTypeSlug,
+  type RegionSlug,
+  type RazvlTypeSlug,
+  type ServiceRubricSlug,
+  type CuisineKeySlug,
+  type EdaCityKey,
+};
+
+/**
+ * Per-city страницы «Где поесть» (§8.6): ключ → URL-слаг страницы (`/food/{slug}/`)
+ * + слаг города для ссылки на путеводитель `/cities/{citySlug}/`. Локализованный
+ * контент — в словарях (`eda.cityPages.items[key]`). Порядок = порядок ссылок
+ * на хабе /food/ и в getStaticPaths шаблона CityFoodPage.
+ */
+export const EDA_CITY_PAGES = [
+  { key: 'yerevan', slug: 'where-to-eat-yerevan', citySlug: 'yerevan' },
+  { key: 'gyumri', slug: 'where-to-eat-gyumri', citySlug: 'gyumri' },
+  { key: 'dilijan', slug: 'where-to-eat-dilijan', citySlug: 'dilijan' },
+] as const satisfies ReadonlyArray<{ key: EdaCityKey; slug: string; citySlug: string }>;
+
+const dictionaries: Record<Lang, UIDictionary> = { en };
+
+/** Словарь UI-строк для языка. */
+export function t(lang: Lang): UIDictionary {
+  return dictionaries[lang];
+}
+
+/**
+ * Сопоставление контентных хабов с партнёрами Trip.com (§16, §8.3).
+ * Ключи совпадают с ключами в partners.json — менять только синхронно с §16.
+ * Используется в HubPage для условного рендера AffiliateBox.
+ */
+export const HUB_AFFILIATE_PARTNER: Partial<Record<HubSectionKey, string>> = {
+  'car-rental': 'trip-carhire',
+  transport: 'aviasales',
+  cities: 'trip-hotels',
+  entertainment: 'trip-tours',
+};
+
+/** Список разделов IA в порядке навигации (§7), кроме `home` и `o-sajte`. */
+export const SECTION_KEYS: SectionKey[] = [
+  'attractions',
+  'cities',
+  'food',
+  'entertainment',
+  'routes',
+  'planning',
+  'transport',
+  'car-rental',
+  'insurance',
+  'news',
+  'relocation',
+];
+
+/** 5 главных плиток входа на главной (§8.4): + «Развлечения» (решение владельца 2026-06-16). */
+export const PRIMARY_TILE_KEYS = ['attractions', 'cities', 'food', 'entertainment', 'routes'] as const;
+
+/** Все разделы для футера и блока «Все разделы» на главной (§8.4): хабы + «О проекте» + «Обратная связь». */
+export const ALL_SECTION_KEYS: SectionKey[] = [...SECTION_KEYS, 'about', 'contact'];
+
+/**
+ * Простая подстановка плейсхолдеров вида `{name}` в строку словаря.
+ * Используется для дат («Проверено · {date}») и имён языка.
+ */
+export function format(template: string, vars: Record<string, string>): string {
+  return template.replace(/\{(\w+)\}/g, (_, key: string) => vars[key] ?? `{${key}}`);
+}
+
+/**
+ * Префикс пути для языка. Сайт одноязычный (en на корне) — префикса нет.
+ * Финальный слэш добавляется на уровне URL (trailingSlash: 'always').
+ */
+export function langPrefix(_lang: Lang): string {
+  return '';
+}
+
+/**
+ * Зеркальный путь текущей страницы на другом языке (§12). Сайт одноязычный —
+ * единственный язык на корне, поэтому путь возвращается без изменений.
+ * Оставлено для совместимости сигнатур (hreflang self / x-default).
+ */
+export function mirrorPath(currentPath: string, _targetLang: Lang): string {
+  return currentPath;
+}
+
+/**
+ * URL раздела для языка. `home` → корень версии.
+ * Всегда с завершающим слэшем (§7).
+ */
+export function sectionHref(lang: Lang, section: SectionKey): string {
+  const prefix = langPrefix(lang);
+  if (section === 'home') return `${prefix}/`;
+  return `${prefix}/${section}/`;
+}
+
+/**
+ * URL статьи: `/{category}/{slug}/` (en на корне; сайт одноязычный на старте).
+ * Всегда с завершающим слэшем (§7). Используется в карточках, хабах,
+ * перелинковке и getStaticPaths шаблона статьи.
+ */
+export function articleHref(lang: Lang, category: string, slug: string): string {
+  return `${langPrefix(lang)}/${category}/${slug}/`;
+}
+
+/**
+ * Слаги месяцев в порядке года — совпадают с enum MONTHS в content.config.ts
+ * (поле `bestSeason` маршрутов, §11). Индекс в массиве = номер месяца (0–11),
+ * по нему берётся локализованное название из словаря (`route.months`).
+ */
+export const MONTH_SLUGS = [
+  'january',
+  'february',
+  'march',
+  'april',
+  'may',
+  'june',
+  'july',
+  'august',
+  'september',
+  'october',
+  'november',
+  'december',
+] as const;
+
+/** Локализованное название месяца по его слугу (§11 bestSeason → §12 словарь). */
+export function monthName(lang: Lang, slug: string): string {
+  const idx = MONTH_SLUGS.indexOf(slug as (typeof MONTH_SLUGS)[number]);
+  const names = t(lang).route.months;
+  return idx >= 0 ? names[idx] : slug;
+}
+
+/**
+ * Локализованный лейбл типа достопримечательности по слугу (§8.3 →
+ * `attractionType` в content.config.ts → словарь). Неизвестный слуг
+ * возвращается как есть (страховка, обычно не наступает — enum в схеме).
+ */
+export function attractionTypeLabel(lang: Lang, slug: string): string {
+  const labels = t(lang).attractionTypes;
+  return (labels as Record<string, string>)[slug] ?? slug;
+}
+
+/** Локализованный лейбл региона (мхаре) по слугу (§7 → `region` → словарь). */
+export function regionLabel(lang: Lang, slug: string): string {
+  const labels = t(lang).regions;
+  return (labels as Record<string, string>)[slug] ?? slug;
+}
+
+/** Локализованный лейбл подкатегории «Развлечений» по слугу (§7 → `razvlType`). */
+export function razvlTypeLabel(lang: Lang, slug: string): string {
+  const labels = t(lang).razvlTypes;
+  return (labels as Record<string, string>)[slug] ?? slug;
+}
+
+/** Локализованный лейбл рубрики услуги по слугу (§7 → `services.rubric`). */
+export function serviceRubricLabel(lang: Lang, slug: string): string {
+  const labels = t(lang).serviceRubrics;
+  return (labels as Record<string, string>)[slug] ?? slug;
+}
+
+/** BCP-47 локаль для Intl по языку версии (§12). */
+const LOCALE: Record<Lang, string> = { en: 'en-US' };
+
+/**
+ * Видимая дата для бейджей «Проверено · {дата}» (§9). Дата приходит из
+ * frontmatter (Date), форматируется по локали версии. UTC-таймзона, чтобы
+ * день не «съезжал» между сборками в разных окружениях.
+ */
+export function formatDate(date: Date, lang: Lang): string {
+  return new Intl.DateTimeFormat(LOCALE[lang], {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    timeZone: 'UTC',
+  }).format(date);
+}

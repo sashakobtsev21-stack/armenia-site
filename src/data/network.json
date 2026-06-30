@@ -1,0 +1,13 @@
+{
+  "$note": "Кросс-сеть путеводителей (DIST-R1-03): ссылки на сестринские сайты сети для кросс-линкинга и общих роуд-трип-страниц. Для Армении самый релевантный сосед — Грузия (Кавказ-комбо, общий трек Ереван↔Тбилиси). Пока соседние сайты не запущены/не связаны — enabled:false и url пустой → блок НЕ рендерится. Появится живой сайт сети → проставить url + enabled:true, и ссылки появятся в футере на всех страницах. Взаимность ссылок (партнёр готов ставить ответную) — условие сети.",
+  "heading": {
+    "en": "Part of the guides network"
+  },
+  "siblings": [
+    { "key": "georgia", "label": "Georgia Guidebook", "url": "", "enabled": false },
+    { "key": "montenegro", "label": "Montenegro Guidebook", "url": "", "enabled": false },
+    { "key": "croatia", "label": "Croatia Guidebook", "url": "", "enabled": false },
+    { "key": "albania", "label": "Albania Guidebook", "url": "", "enabled": false },
+    { "key": "macedonia", "label": "North Macedonia Guidebook", "url": "", "enabled": false }
+  ]
+}

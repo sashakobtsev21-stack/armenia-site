@@ -1,0 +1,8 @@
+# robots.txt — Armenia Guidebook (SPEC §14).
+# OFF-DOMAIN: сайт строится и тестируется ДО публичной индексации. Пока не готов —
+# обход ЗАПРЕЩЁН целиком (Disallow: /). К запуску вернуть «Allow: /» + «Disallow: /go/».
+# Карта сайта — индекс, который генерирует @astrojs/sitemap (en).
+User-agent: *
+Disallow: /
+
+Sitemap: https://armeniaguidebook.com/sitemap-index.xml

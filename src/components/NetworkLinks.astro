@@ -1,0 +1,67 @@
+---
+/**
+ * NetworkLinks (DIST-R1-03) — блок «часть сети путеводителей»: кросс-ссылки на
+ * сестринские сайты сети из src/data/network.json (для Армении ключевой сосед —
+ * Грузия, Кавказ-комбо).
+ * Рендерится ТОЛЬКО когда есть включённые соседи (enabled:true + непустой url);
+ * пока сеть не запущена — компонент ничего не выводит. Ссылки dofollow —
+ * передают вес внутри сети (взаимность — условие O3).
+ */
+import network from '../data/network.json';
+import type { Lang } from '../i18n';
+
+interface Props {
+  lang: Lang;
+}
+const { lang } = Astro.props;
+
+const siblings = network.siblings.filter((s) => s.enabled && s.url);
+const heading = (network.heading as Record<Lang, string>)[lang] ?? network.heading.en;
+---
+
+{
+  siblings.length > 0 && (
+    <nav class="network" aria-label={heading}>
+      <p class="network__heading">{heading}</p>
+      <ul class="network__list">
+        {siblings.map((s) => (
+          <li>
+            <a class="u-underline" href={s.url} rel="noopener">
+              {s.label}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </nav>
+  )
+}
+
+<style>
+  .network {
+    padding-top: var(--space-6);
+    border-top: 1px solid var(--border-hairline);
+    margin-bottom: var(--space-6);
+  }
+  .network__heading {
+    margin: 0 0 var(--space-2);
+    font-weight: 600;
+    color: var(--text-body);
+  }
+  .network__list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2) var(--space-5);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+  .network__list a {
+    color: var(--link);
+    text-decoration: none;
+    transition: color var(--dur-fast) var(--ease-standard);
+  }
+  .network__list a:hover,
+  .network__list a:focus-visible {
+    color: var(--link-hover);
+  }
+</style>

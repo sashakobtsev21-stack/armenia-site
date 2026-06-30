@@ -1,0 +1,54 @@
+{
+  "$schema-note": "Карта партнёров для /go/ (SPEC §16). Ключ — партнёр из URL /go/{partner}. urlTemplate — целевой URL с плейсхолдером {subid}, куда подставляется ?c={slug} клика (SubID для атрибуции). Прямые URL партнёрок в контенте запрещены — только через /go/. Подключено: Trip.com (Allianceid 8701645, SID 319548076, trip_sub3 D17960553); {subid} идёт в trip_sub1. Localrent, Aviasales, Yesim, Kiwitaxi и т.п. — трекинг-ссылки Travelpayouts (*.tpx.gr) с SubID: {subid} подставляется в ?sub_id=. Под Армению: trip-tours kwd=Armenia (Trip.com отдаёт глубокий тур-инвентарь по Еревану — план §2). Приоритет связок: localrent (авто) · trip-tours (туры) · yesim (eSIM) · kiwitaxi+aviasales (Кавказ-комбо/аэропорт) · trip-hotels (отели) · safetywing (страховка). Авиабилеты — aviasales (trip-flights не используется). EKTA из набора УДАЛЕНА (сломанный прямой URL без атрибуции — не тащим в новый сайт; вернуть только корректной tpx.gr-ссылкой из кабинета Travelpayouts). bikesbooking оставлен в карте, но НЕ вешать на горные хайки (план §4).",
+  "fallback": "/",
+  "partners": {
+    "trip-carhire": {
+      "urlTemplate": "https://www.trip.com/carhire/?Allianceid=8701645&SID=319548076&trip_sub1={subid}&trip_sub3=D17960553",
+      "allowSubId": true
+    },
+    "trip-flights": {
+      "urlTemplate": "https://www.trip.com/flights/?Allianceid=8701645&SID=319548076&trip_sub1={subid}&trip_sub3=D17960553",
+      "allowSubId": true
+    },
+    "trip-hotels": {
+      "urlTemplate": "https://www.trip.com/hotels?Allianceid=8701645&SID=319548076&trip_sub1={subid}&trip_sub3=D17960553",
+      "allowSubId": true
+    },
+    "trip-transfers": {
+      "urlTemplate": "https://www.trip.com/airport-transfers/?Allianceid=8701645&SID=319548076&trip_sub1={subid}&trip_sub3=D17960553",
+      "allowSubId": true
+    },
+    "trip-tours": {
+      "urlTemplate": "https://www.trip.com/package-tours/list?tab=1261&kwd=Armenia&poid=&poitype=&kwdfrom=srch&Allianceid=8701645&SID=319548076&trip_sub1={subid}&trip_sub3=D17960553",
+      "allowSubId": true
+    },
+    "safetywing": {
+      "urlTemplate": "https://safetywing.com/?referenceID=26545532&utm_source=26545532&utm_medium=Ambassador",
+      "allowSubId": false
+    },
+    "airalo": {
+      "urlTemplate": "https://airalo.tpx.gr/TzzHNa8l?sub_id={subid}",
+      "allowSubId": true
+    },
+    "localrent": {
+      "urlTemplate": "https://localrent.tpx.gr/YlAoImTq?sub_id={subid}",
+      "allowSubId": true
+    },
+    "aviasales": {
+      "urlTemplate": "https://aviasales.tpx.gr/EhNbez89?sub_id={subid}",
+      "allowSubId": true
+    },
+    "yesim": {
+      "urlTemplate": "https://yesim.tpx.gr/MSDGcQK7?sub_id={subid}",
+      "allowSubId": true
+    },
+    "kiwitaxi": {
+      "urlTemplate": "https://kiwitaxi.tpx.gr/h1TwpC9K?sub_id={subid}",
+      "allowSubId": true
+    },
+    "bikesbooking": {
+      "urlTemplate": "https://bikesbooking.tpx.gr/H3kR0jvo?sub_id={subid}",
+      "allowSubId": true
+    }
+  }
+}
